@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="Mrbr.Encryption.Data.Identity/Mrbr.Encryption.Data.Identity.csproj" />
+  <Project Path="Mrbr.Encryption.Data.Identity.Tests/Mrbr.Encryption.Data.Identity.Tests.csproj" />
+</Solution>
