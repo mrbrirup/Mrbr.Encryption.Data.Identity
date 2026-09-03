@@ -9,6 +9,24 @@ namespace Mrbr.Encryption.Data.Identity;
 /// </summary>
 public static class IdentityModelBuilderExtensions
 {
+    /// <summary>Replaces Identity's composite token key with UUIDv7 and composite-HMAC routing.</summary>
+    public static ModelBuilder ConfigureEncryptedIdentityTokens<TToken>(this ModelBuilder modelBuilder)
+        where TToken : EncryptedIdentityUserToken<string>
+    {
+        ArgumentNullException.ThrowIfNull(modelBuilder);
+
+        modelBuilder.Entity<TToken>(token =>
+        {
+            token.HasKey(value => value.TokenId);
+            token.Property(value => value.TokenId).ValueGeneratedNever();
+            token.Property(value => value.RoutingHash).HasMaxLength(128).IsRequired();
+            token.HasIndex(value => value.RoutingHash).IsUnique();
+            token.HasIndex(value => value.UserId);
+        });
+
+        return modelBuilder;
+    }
+
     /// <summary>
     /// Removes Identity's conventional indexes over normalized username and email properties.
     /// Generated keyed-HMAC indexes should be configured after this call.

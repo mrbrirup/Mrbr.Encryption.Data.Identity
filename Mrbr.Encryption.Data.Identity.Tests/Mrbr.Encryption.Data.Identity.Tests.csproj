@@ -2,12 +2,18 @@
   <PropertyGroup>
     <TargetFramework>net11.0</TargetFramework>
     <IsPackable>false</IsPackable>
+    <MrbrSourceGeneratorProject>..\..\Mrbr.Encryption.Data\Mrbr.Encryption.Data.SourceGenerator\Mrbr.Encryption.Data.SourceGenerator.csproj</MrbrSourceGeneratorProject>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\Mrbr.Encryption.Data.Identity\Mrbr.Encryption.Data.Identity.csproj" />
+    <ProjectReference Include="..\Mrbr.Encryption.Data.Identity.Migration\Mrbr.Encryption.Data.Identity.Migration.csproj" />
+    <ProjectReference Include="..\Mrbr.Encryption.Data.Identity.Migration.Sqlite\Mrbr.Encryption.Data.Identity.Migration.Sqlite.csproj" />
+    <ProjectReference Include="..\Mrbr.Encryption.Data.Identity.Migration.Console\Mrbr.Encryption.Data.Identity.Migration.Console.csproj" />
+    <ProjectReference Include="..\Mrbr.Encryption.Data.Identity.Migration.PostgreSql\Mrbr.Encryption.Data.Identity.Migration.PostgreSql.csproj" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="10.0.9" />
+    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.3" />
     <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" Version="3.0.3" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.6.0" />
     <PackageReference Include="xunit" Version="2.9.3" />
@@ -15,6 +21,16 @@
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Mrbr.Encryption.Data.SourceGenerator" Version="2.0.0"
+                      Condition="!Exists('$(MrbrSourceGeneratorProject)')"
+                      OutputItemType="Analyzer"
+                      ReferenceOutputAssembly="false" />
+    <ProjectReference Include="$(MrbrSourceGeneratorProject)"
+                      Condition="Exists('$(MrbrSourceGeneratorProject)')"
+                      OutputItemType="Analyzer"
+                      ReferenceOutputAssembly="false" />
   </ItemGroup>
   <ItemGroup>
     <Using Include="Xunit" />

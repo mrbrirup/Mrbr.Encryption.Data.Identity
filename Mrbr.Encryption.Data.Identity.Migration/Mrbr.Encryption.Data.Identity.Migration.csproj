@@ -1,0 +1,7 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net11.0</TargetFramework>
+    <IsPackable>false</IsPackable>
+    <Description>Explicit, operator-driven migration contracts for protected ASP.NET Core Identity data.</Description>
+  </PropertyGroup>
+</Project>

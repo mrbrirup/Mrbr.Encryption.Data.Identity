@@ -14,5 +14,9 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="..\README.md" Pack="true" PackagePath="\" Link="README.md" />
+    <None Include="..\docs\identity-entity-security-audit.md" Pack="true" PackagePath="docs\" Link="docs\identity-entity-security-audit.md" />
+    <None Include="..\docs\identity-token-security-design.md" Pack="true" PackagePath="docs\" Link="docs\identity-token-security-design.md" />
+    <None Include="..\docs\identity-token-migration-design.md" Pack="true" PackagePath="docs\" Link="docs\identity-token-migration-design.md" />
+    <None Include="..\docs\performance-baseline.md" Pack="true" PackagePath="docs\" Link="docs\performance-baseline.md" />
   </ItemGroup>
 </Project>

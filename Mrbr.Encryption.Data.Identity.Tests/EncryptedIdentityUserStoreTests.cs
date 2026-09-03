@@ -54,6 +54,26 @@ public sealed class EncryptedIdentityUserStoreTests
     }
 
     [Fact]
+    public async Task FindByEmailAsync_RejectsAmbiguousVerifiedMatchesInNonUniqueMode()
+    {
+        StubLookup lookup = new()
+        {
+            EmailMatches =
+            [
+                new TestUser { Id = "1" },
+                new TestUser { Id = "2" }
+            ]
+        };
+        await using TestContext context = CreateContext();
+        using TestStore store = new(context, lookup);
+
+        InvalidOperationException exception = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => store.FindByEmailAsync("SHARED@EXAMPLE.TEST"));
+
+        Assert.Contains("multiple verified plaintext matches", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task FindByEmailAsync_PassesCancellationTokenToLookup()
     {
         using CancellationTokenSource cancellation = new();
