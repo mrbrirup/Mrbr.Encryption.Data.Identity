@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Identity;
+using Mrbr.Encryption.Data.Common.Attributes;
 
 namespace Mrbr.Encryption.Data.Identity;
 
@@ -17,4 +18,16 @@ public class EncryptedIdentityUserToken<TKey> : IdentityUserToken<TKey>
 
     /// <summary>Gets or sets the generated composite keyed hash used only for candidate routing.</summary>
     public string RoutingHash { get; set; } = null!;
+
+    /// <inheritdoc />
+    [Encrypted("IdentityToken")]
+    public override string LoginProvider { get; set; } = null!;
+
+    /// <inheritdoc />
+    [Encrypted("IdentityToken")]
+    public override string Name { get; set; } = null!;
+
+    /// <inheritdoc />
+    [Encrypted("IdentityToken")]
+    public override string? Value { get; set; }
 }

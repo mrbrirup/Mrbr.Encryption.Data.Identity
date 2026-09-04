@@ -27,9 +27,45 @@ public static class IdentityModelBuilderExtensions
         return modelBuilder;
     }
 
+    /// <summary>Configures flattened protected passkey persistence for a selected key type.</summary>
+    public static ModelBuilder ConfigureEncryptedIdentityPasskeys<TKey, TPasskey>(this ModelBuilder modelBuilder)
+        where TKey : IEquatable<TKey>
+        where TPasskey : EncryptedIdentityUserPasskey<TKey>
+    {
+        ArgumentNullException.ThrowIfNull(modelBuilder);
+        modelBuilder.Entity<TPasskey>(passkey =>
+        {
+            passkey.Ignore(value => value.CredentialId);
+            passkey.Ignore(value => value.Data);
+            passkey.HasKey(value => value.PasskeyId);
+            passkey.Property(value => value.PasskeyId).ValueGeneratedNever();
+            passkey.Property(value => value.RoutingHash).HasMaxLength(128).IsRequired();
+            passkey.HasIndex(value => value.RoutingHash).IsUnique();
+            passkey.HasIndex(value => value.UserId);
+        });
+        return modelBuilder;
+    }
+
     /// <summary>Replaces Identity's plaintext external-login key with a UUIDv7 key and HMAC route.</summary>
     public static ModelBuilder ConfigureEncryptedIdentityLogins<TLogin>(this ModelBuilder modelBuilder)
         where TLogin : EncryptedIdentityUserLogin
+    {
+        ArgumentNullException.ThrowIfNull(modelBuilder);
+        modelBuilder.Entity<TLogin>(login =>
+        {
+            login.HasKey(value => value.LoginId);
+            login.Property(value => value.LoginId).ValueGeneratedNever();
+            login.Property(value => value.RoutingHash).HasMaxLength(128).IsRequired();
+            login.HasIndex(value => value.RoutingHash).IsUnique();
+            login.HasIndex(value => value.UserId);
+        });
+        return modelBuilder;
+    }
+
+    /// <summary>Configures protected external-login persistence for a selected key type.</summary>
+    public static ModelBuilder ConfigureEncryptedIdentityLogins<TKey, TLogin>(this ModelBuilder modelBuilder)
+        where TKey : IEquatable<TKey>
+        where TLogin : EncryptedIdentityUserLogin<TKey>
     {
         ArgumentNullException.ThrowIfNull(modelBuilder);
         modelBuilder.Entity<TLogin>(login =>
@@ -66,6 +102,28 @@ public static class IdentityModelBuilderExtensions
         return modelBuilder;
     }
 
+    /// <summary>Configures protected claim routes for a selected key type.</summary>
+    public static ModelBuilder ConfigureEncryptedIdentityClaims<TKey, TUserClaim, TRoleClaim>(this ModelBuilder modelBuilder)
+        where TKey : IEquatable<TKey>
+        where TUserClaim : EncryptedIdentityUserClaim<TKey>
+        where TRoleClaim : EncryptedIdentityRoleClaim<TKey>
+    {
+        ArgumentNullException.ThrowIfNull(modelBuilder);
+        modelBuilder.Entity<TUserClaim>(claim =>
+        {
+            claim.Property(value => value.RoutingHash).HasMaxLength(128).IsRequired();
+            claim.HasIndex(value => value.RoutingHash);
+            claim.HasIndex(value => value.UserId);
+        });
+        modelBuilder.Entity<TRoleClaim>(claim =>
+        {
+            claim.Property(value => value.RoutingHash).HasMaxLength(128).IsRequired();
+            claim.HasIndex(value => value.RoutingHash);
+            claim.HasIndex(value => value.RoleId);
+        });
+        return modelBuilder;
+    }
+
     /// <summary>Replaces Identity's composite token key with UUIDv7 and composite-HMAC routing.</summary>
     public static ModelBuilder ConfigureEncryptedIdentityTokens<TToken>(this ModelBuilder modelBuilder)
         where TToken : EncryptedIdentityUserToken<string>
@@ -81,6 +139,23 @@ public static class IdentityModelBuilderExtensions
             token.HasIndex(value => value.UserId);
         });
 
+        return modelBuilder;
+    }
+
+    /// <summary>Configures protected token persistence for a selected key type.</summary>
+    public static ModelBuilder ConfigureEncryptedIdentityTokens<TKey, TToken>(this ModelBuilder modelBuilder)
+        where TKey : IEquatable<TKey>
+        where TToken : EncryptedIdentityUserToken<TKey>
+    {
+        ArgumentNullException.ThrowIfNull(modelBuilder);
+        modelBuilder.Entity<TToken>(token =>
+        {
+            token.HasKey(value => value.TokenId);
+            token.Property(value => value.TokenId).ValueGeneratedNever();
+            token.Property(value => value.RoutingHash).HasMaxLength(128).IsRequired();
+            token.HasIndex(value => value.RoutingHash).IsUnique();
+            token.HasIndex(value => value.UserId);
+        });
         return modelBuilder;
     }
 

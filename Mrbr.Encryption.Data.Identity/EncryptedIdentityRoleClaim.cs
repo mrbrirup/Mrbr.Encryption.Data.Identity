@@ -9,11 +9,7 @@ public class EncryptedIdentityRoleClaim<TKey> : IdentityRoleClaim<TKey>
 {
     /// <summary>Gets or sets the HMAC route over role ID, claim type, and claim value.</summary>
     public string RoutingHash { get; set; } = null!;
-}
 
-/// <summary>A reusable string-key Identity role claim with encrypted contents.</summary>
-public class EncryptedIdentityRoleClaim : EncryptedIdentityRoleClaim<string>
-{
     /// <inheritdoc />
     [Encrypted("IdentityAuthorization")]
     public override string? ClaimType { get; set; }
@@ -21,4 +17,9 @@ public class EncryptedIdentityRoleClaim : EncryptedIdentityRoleClaim<string>
     /// <inheritdoc />
     [Encrypted("IdentityAuthorization")]
     public override string? ClaimValue { get; set; }
+}
+
+/// <summary>A reusable string-key Identity role claim with encrypted contents.</summary>
+public class EncryptedIdentityRoleClaim : EncryptedIdentityRoleClaim<string>
+{
 }

@@ -14,8 +14,7 @@ namespace Mrbr.Encryption.Data.Identity;
 /// Relational identifiers and concurrency state remain plaintext. Operational flags, timestamps,
 /// and counters are independently protected through the <c>IdentityOperational</c> domain.
 /// </remarks>
-public class EncryptedIdentityUser : IdentityUser
-{
+public class EncryptedIdentityUser : IdentityUser {
     /// <inheritdoc />
     [Encrypted("IdentityPII")]
     public override string? UserName { get; set; }
@@ -39,7 +38,6 @@ public class EncryptedIdentityUser : IdentityUser
     public override string? PhoneNumber { get; set; }
 
     /// <inheritdoc />
-    [Encrypted("IdentityCredential")]
     public override string? PasswordHash { get; set; }
 
     /// <inheritdoc />
