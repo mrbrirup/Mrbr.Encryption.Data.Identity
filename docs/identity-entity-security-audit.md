@@ -1,6 +1,6 @@
 # ASP.NET Core Identity entity security audit
 
-Status: proposed security design  
+Status: active security design; user, token, role, claim, and new-schema external-login runtime phases implemented
 Baseline: `Microsoft.AspNetCore.Identity.EntityFrameworkCore` 10.0.9  
 Target runtime: .NET 11
 
@@ -10,7 +10,7 @@ This document decides how `Mrbr.Encryption.Data.Identity` should protect the sta
 
 The baseline model contains users, roles, user-role links, user claims, role claims, external logins, user tokens, and passkeys. Identity permits applications to replace each CLR entity type through the generic `IdentityDbContext` hierarchy, so the implementation should use explicit derived entities rather than modifying Microsoft types implicitly. See Microsoft's [Identity model customization guidance](https://learn.microsoft.com/en-us/aspnet/core/security/authentication/customize-identity-model?view=aspnetcore-10.0).
 
-This is a design audit, not a statement that every recommendation below is already implemented.
+This is a design audit. The implementation-order section records which recommendations are implemented and which remain proposed.
 
 ## Threat model and boundaries
 
@@ -59,7 +59,7 @@ Encryption and hashing attributes on one property may use different source keys.
 - Treat role names and claim names/values as confidential by default. Their small, enumerable vocabularies make unkeyed hashes especially unsuitable. Keyed HMAC prevents a database-only attacker from testing guesses without the external key, although equality frequency remains visible.
 - Encrypt token provider and token name metadata and add keyed hashes for routing. They must not remain permanently plaintext merely because their value sets are small.
 - Use application-generated RFC 9562 UUIDv7 values as protected token surrogate primary keys. This improves insertion locality but exposes approximate creation time and ordering; identifiers must not be treated as unpredictable secrets.
-- Protect each passkey field separately rather than serializing all `IdentityPasskeyData` into one encrypted blob. This keeps the model visible and maintainable, but requires typed field protection before passkeys can be supported.
+- Protect each passkey field separately rather than serializing all `IdentityPasskeyData` into one encrypted blob. The data layer now provides versioned typed encodings for this provider-neutral passkey representation.
 - Use PostgreSQL as the second integration-test provider after SQLite.
 
 ## Entity audit
@@ -177,7 +177,7 @@ Identity 10 includes passkey persistence in the `IdentityUserContext` model. The
 | `Data.IsBackedUp`, `Data.IsBackupEligible`, `Data.IsUserVerified` | Encrypt separately | Credential state metadata; requires Boolean protection. |
 | `Data.SignCount` | Encrypt separately | Replay-detection state; requires unsigned-integer protection and tested atomic/concurrent updates. |
 
-Passkeys should not be implemented until the generated data layer supports separate protected `byte[]`, `DateTimeOffset`, `bool`, `uint`, `string`, and string-collection fields. Each stored representation must be versioned even though the fields remain independently protected. Never transform private passkey material because the server should not possess it.
+Passkeys use separate protected `byte[]`, `DateTimeOffset`, `bool`, `uint`, `string`, and string-collection fields. Each stored representation is versioned even though the fields remain independently protected. The credential ID has a keyed route for lookup, followed by fixed-time verification of the decrypted candidate. No private passkey material is stored because the server should not possess it.
 
 ## Cross-cutting requirements
 
@@ -218,9 +218,9 @@ Passkeys should not be implemented until the generated data layer supports separ
 
 1. **User baseline — implemented:** protected user strings, keyed username/email lookup, collision verification, generated user store, removal of plaintext lookup indexes, support for both email-uniqueness modes, and startup options validation.
 2. **Token records — provider integration, benchmarks, and SQLite/PostgreSQL migration tooling complete:** UUIDv7 surrogate-key entity, encrypted provider/name/value fields, generated composite-HMAC routing, generated store integration, adversarial hardening, raw-storage verification, indexed PostgreSQL query-plan verification, concurrent insertion tests and performance baselines are implemented. The offline state/coordinator, both provider executors, and operator console include generated protection plus all-row runtime verification, durable non-secret checkpoints, a protected-write gate, safe pre-write rollback, explicit approved plaintext removal, DDL/checkpoint crash reconciliation, integrity gates, cancellation/corruption failure injection, and one acknowledged transition per command.
-3. **Roles:** derived role entity, encrypted role name, HMAC normalized-name lookup, generated role store and index replacement.
-4. **Claims:** derived user/role claim entities with encrypted contents and verified composite lookup for replace/remove operations.
-5. **External logins:** surrogate-key schema, encrypted provider data, composite HMAC lookup and custom store operations.
+3. **Roles — new-schema runtime complete:** opt-in derived role entities can encrypt `Name`, encrypt and uniquely HMAC-index `NormalizedName`, remove `RoleNameIndex`, and use a generated collision-verifying lookup plus generated `RoleStore`. `RoleManager.FindByNameAsync` is verified end to end against SQLite, raw storage contains only ciphertext and keyed hashes, and multiple verified matches fail closed. Existing-row migration and PostgreSQL role-specific integration coverage remain before release completion.
+4. **Claims — new-schema runtime complete:** derived user/role claim entities encrypt type and value and carry a domain-separated composite HMAC over owner ID, type, and value. Generated claim-aware stores support add, replace, remove, protected tokens in the same context, collision verification, and fail-closed mismatch handling. `GetUsersForClaimAsync` currently uses a verified scan because the owner-specific route cannot serve a global type/value query. Existing-row migrations, a separately reviewed global route, PostgreSQL claim-specific integration tests, and benchmarks remain before release completion.
+5. **External logins — new-schema SQLite runtime complete:** the provider-neutral login entity uses a UUIDv7 surrogate key, encrypts provider, provider key, and display name, and has a unique domain-separated provider/key HMAC route. Generated stores cover add, find, list, and remove operations, verify decrypted collision candidates, and compose with protected claims and tokens. Existing-row migrations, PostgreSQL-specific integration coverage, concurrency tests, and benchmarks remain before release completion.
 6. **Passkeys:** add typed per-field protection and settle each field's storage, integrity and concurrency behaviour before implementation.
 7. **Typed operational fields:** decide whether metadata leakage warrants converters for Boolean, timestamp and counter fields; performance-test before changing them.
 8. **Custom key types:** generalise generated stores beyond the current string-key `IdentityDbContext<TUser>` boundary.
@@ -239,7 +239,7 @@ Passkeys should not be implemented until the generated data layer supports separ
 ## Remaining design work
 
 - Define the surrogate relational key and composite HMAC input format for external-login entities. The token format is now defined in the protected user-token design.
-- Add supported storage encodings for each passkey field type without collapsing the record into one opaque blob.
+- Completed: add supported storage encodings for each passkey field type without collapsing the record into one opaque blob, plus generated passkey add/update, lookup, list, and removal operations.
 - Continue operational and failure-injection hardening around both completed provider workflows before making migration tooling packable.
 
 The generator must not silently protect additional Identity entities merely because the Identity package is referenced. Each phase remains an explicit opt-in until its entity model, generated store operations, migrations and tests are complete.

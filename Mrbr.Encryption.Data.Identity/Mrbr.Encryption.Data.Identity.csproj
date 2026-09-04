@@ -7,10 +7,14 @@
     <Description>ASP.NET Core Identity integration for source-generated encrypted Entity Framework data.</Description>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <MrbrEntityFrameworkProject>..\..\Mrbr.Encryption.Data\Mrbr.Encryption.Data.EntityFramework\Mrbr.Encryption.Data.EntityFramework.csproj</MrbrEntityFrameworkProject>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" Version="10.0.9" />
-    <PackageReference Include="Mrbr.Encryption.Data.EntityFramework" Version="2.0.0" />
+    <PackageReference Include="Mrbr.Encryption.Data.EntityFramework" Version="2.0.0"
+                      Condition="!Exists('$(MrbrEntityFrameworkProject)')" />
+    <ProjectReference Include="$(MrbrEntityFrameworkProject)"
+                      Condition="Exists('$(MrbrEntityFrameworkProject)')" />
   </ItemGroup>
   <ItemGroup>
     <None Include="..\README.md" Pack="true" PackagePath="\" Link="README.md" />

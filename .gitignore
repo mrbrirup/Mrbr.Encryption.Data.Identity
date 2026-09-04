@@ -235,6 +235,7 @@ ClientBin/
 *~
 *.dbmdl
 *.dbproj.schemaview
+Mrbr.Encryption.Data.Identity.SqliteDemo/identity-encryption-demo.db
 *.jfm
 *.pfx
 *.publishsettings

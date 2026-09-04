@@ -2,18 +2,20 @@
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <TargetFramework>net11.0</TargetFramework>
-    <IsPackable>false</IsPackable>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\Mrbr.Encryption.Data.Identity\Mrbr.Encryption.Data.Identity.csproj" />
-  </ItemGroup>
-  <ItemGroup>
-    <PackageReference Include="BenchmarkDotNet" Version="0.16.0-preview.1" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="10.0.9" />
-    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.3" />
-    <PackageReference Include="SQLitePCLRaw.lib.e_sqlite3" Version="2.1.13" />
+    <ProjectReference Include="..\..\Mrbr.Encryption.Data\Mrbr.Encryption.Data.Common\Mrbr.Encryption.Data.Common.csproj" />
     <ProjectReference Include="..\..\Mrbr.Encryption.Data\Mrbr.Encryption.Data.EntityFramework\Mrbr.Encryption.Data.EntityFramework.csproj" />
+    <ProjectReference Include="..\..\Mrbr.Encryption.Data\Mrbr.Encryption.Data.SourceGenerator\Mrbr.Encryption.Data.SourceGenerator.csproj"
+                      OutputItemType="Analyzer"
+                      ReferenceOutputAssembly="false" />
     <ProjectReference Include="..\..\Mrbr.Service.EncryptionManager\Mrbr.Service.EncryptionManager\Mrbr.Service.EncryptionManager.csproj" />
     <ProjectReference Include="..\..\Mrbr.Service.KeyManager\Mrbr.Service.KeyManager\Mrbr.Service.KeyManager.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" Version="10.0.9" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="10.0.9" />
+    <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" Version="3.0.5" />
   </ItemGroup>
 </Project>

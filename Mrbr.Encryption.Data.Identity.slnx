@@ -1,5 +1,6 @@
 <Solution>
   <Project Path="Mrbr.Encryption.Data.Identity/Mrbr.Encryption.Data.Identity.csproj" />
+  <Project Path="Mrbr.Encryption.Data.Identity.SqliteDemo/Mrbr.Encryption.Data.Identity.SqliteDemo.csproj" />
   <Project Path="Mrbr.Encryption.Data.Identity.Benchmarks/Mrbr.Encryption.Data.Identity.Benchmarks.csproj" />
   <Project Path="Mrbr.Encryption.Data.Identity.Migration/Mrbr.Encryption.Data.Identity.Migration.csproj" />
   <Project Path="Mrbr.Encryption.Data.Identity.Migration.Sqlite/Mrbr.Encryption.Data.Identity.Migration.Sqlite.csproj" />

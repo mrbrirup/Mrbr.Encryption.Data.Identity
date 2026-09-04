@@ -35,7 +35,7 @@ public sealed class GeneratedEncryptedIdentityTokenWorkflowTests
             services.AddSingleton(CreateSourceKeyMap());
             services.AddDbContext<GeneratedTokenContext>(options => options.UseSqlite(connectionString));
             services.AddIdentityCore<GeneratedUser>()
-                .AddRoles<IdentityRole>()
+                .AddRoles<GeneratedRole>()
                 .AddEntityFrameworkStores<GeneratedTokenContext>()
                 .AddMrbrGeneratedIdentityStore<GeneratedTokenContext>();
             services.AddMrbrGeneratedIdentityTokenMigrationAdapter<GeneratedTokenContext>();
@@ -141,7 +141,7 @@ public sealed class GeneratedEncryptedIdentityTokenWorkflowTests
         services.AddSingleton(CreateSourceKeyMap());
         services.AddDbContext<GeneratedTokenContext>(options => options.UseSqlite(connection));
         services.AddIdentityCore<GeneratedUser>()
-            .AddRoles<IdentityRole>()
+            .AddRoles<GeneratedRole>()
             .AddEntityFrameworkStores<GeneratedTokenContext>()
             .AddMrbrGeneratedIdentityStore<GeneratedTokenContext>();
         services.AddMrbrGeneratedIdentityTokenMigrationAdapter<GeneratedTokenContext>();
@@ -205,7 +205,7 @@ public sealed class GeneratedEncryptedIdentityTokenWorkflowTests
         services.AddSingleton(CreateSourceKeyMap());
         services.AddDbContext<GeneratedTokenContext>(options => options.UseSqlite(connection));
         services.AddIdentityCore<GeneratedUser>()
-            .AddRoles<IdentityRole>()
+            .AddRoles<GeneratedRole>()
             .AddEntityFrameworkStores<GeneratedTokenContext>()
             .AddMrbrGeneratedIdentityStore<GeneratedTokenContext>();
 
@@ -221,6 +221,16 @@ public sealed class GeneratedEncryptedIdentityTokenWorkflowTests
         Assert.Equal(
             "token-secret",
             await users.GetAuthenticationTokenAsync(user, "provider", "purpose"));
+        UserLoginInfo externalLogin = new("external-provider", "external-key", "External account");
+        Assert.True((await users.AddLoginAsync(user, externalLogin)).Succeeded);
+        Assert.Equal(user.Id, (await users.FindByLoginAsync(externalLogin.LoginProvider, externalLogin.ProviderKey))?.Id);
+        byte[] credentialId = [10, 20, 30, 40];
+        UserPasskeyInfo passkey = new(
+            credentialId, [50, 60, 70], DateTimeOffset.UtcNow, 3, ["internal"],
+            true, true, false, [80, 90], [100, 110]) { Name = "Laptop" };
+        Assert.True((await users.AddOrUpdatePasskeyAsync(user, passkey)).Succeeded);
+        Assert.Equal(user.Id, (await users.FindByPasskeyIdAsync(credentialId))?.Id);
+        Assert.Equal("Laptop", (await users.GetPasskeyAsync(user, credentialId))?.Name);
 
         context.ChangeTracker.Clear();
         await using DbCommand command = connection.CreateCommand();
@@ -232,6 +242,42 @@ public sealed class GeneratedEncryptedIdentityTokenWorkflowTests
         AssertProtected(reader.GetString(2), "purpose");
         AssertProtected(reader.GetString(3), "token-secret");
         Assert.Equal(64, reader.GetString(4).Length);
+        await reader.CloseAsync();
+
+        command.CommandText = "SELECT LoginId, LoginProvider, ProviderKey, ProviderDisplayName, RoutingHash FROM AspNetUserLogins";
+        await using DbDataReader loginReader = await command.ExecuteReaderAsync();
+        Assert.True(await loginReader.ReadAsync());
+        Assert.Equal(7, Guid.Parse(loginReader.GetString(0)).Version);
+        AssertProtected(loginReader.GetString(1), externalLogin.LoginProvider);
+        AssertProtected(loginReader.GetString(2), externalLogin.ProviderKey);
+        AssertProtected(loginReader.GetString(3), externalLogin.ProviderDisplayName!);
+        Assert.Equal(64, loginReader.GetString(4).Length);
+        await loginReader.CloseAsync();
+
+        command.CommandText = "SELECT ProtectedCredentialId, RoutingHash, PublicKey, PasskeyName, SignCount, Transports FROM UserPasskeys";
+        await using DbDataReader passkeyReader = await command.ExecuteReaderAsync();
+        Assert.True(await passkeyReader.ReadAsync());
+        AssertProtected(passkeyReader.GetString(0), Convert.ToBase64String(credentialId));
+        Assert.Equal(64, passkeyReader.GetString(1).Length);
+        Assert.StartsWith("protected:", passkeyReader.GetString(2), StringComparison.Ordinal);
+        AssertProtected(passkeyReader.GetString(3), "Laptop");
+        Assert.StartsWith("protected:", passkeyReader.GetString(4), StringComparison.Ordinal);
+        Assert.StartsWith("protected:", passkeyReader.GetString(5), StringComparison.Ordinal);
+        await passkeyReader.CloseAsync();
+
+        Assert.True((await users.RemoveLoginAsync(user, externalLogin.LoginProvider, externalLogin.ProviderKey)).Succeeded);
+        Assert.Null(await users.FindByLoginAsync(externalLogin.LoginProvider, externalLogin.ProviderKey));
+        Assert.True((await users.AddLoginAsync(user, externalLogin)).Succeeded);
+        context.ChangeTracker.Clear();
+        EncryptedIdentityUserLogin storedLogin = await context.Set<EncryptedIdentityUserLogin>().SingleAsync();
+        storedLogin.ProviderKey = "collision-value";
+        await context.SaveChangesAsync();
+        IdentityDataProtectionException collision = await Assert.ThrowsAsync<IdentityDataProtectionException>(() =>
+            users.FindByLoginAsync(externalLogin.LoginProvider, externalLogin.ProviderKey));
+        Assert.Equal(ProtectionFailureCode.HashMismatch, collision.FailureCode);
+
+        Assert.True((await users.RemovePasskeyAsync(user, credentialId)).Succeeded);
+        Assert.Null(await users.FindByPasskeyIdAsync(credentialId));
     }
 
     [Theory]
@@ -248,7 +294,7 @@ public sealed class GeneratedEncryptedIdentityTokenWorkflowTests
         services.AddSingleton(CreateSourceKeyMap());
         services.AddDbContext<GeneratedTokenContext>(options => options.UseSqlite(connection));
         services.AddIdentityCore<GeneratedUser>()
-            .AddRoles<IdentityRole>()
+            .AddRoles<GeneratedRole>()
             .AddEntityFrameworkStores<GeneratedTokenContext>()
             .AddMrbrGeneratedIdentityStore<GeneratedTokenContext>();
 
@@ -281,7 +327,9 @@ public sealed class GeneratedEncryptedIdentityTokenWorkflowTests
         IdentityPII = Config(1, encryption: true, hashing: true),
         IdentityToken = Config(2, encryption: true, hashing: false),
         IdentityCredential = Config(3, encryption: true, hashing: false),
-        IdentityTokenLookup = Config(4, encryption: false, hashing: true)
+        IdentityTokenLookup = Config(4, encryption: false, hashing: true),
+        IdentityExternalLogin = Config(5, encryption: true, hashing: false)
+        , IdentityPasskey = Config(6, encryption: true, hashing: false)
     };
 
     private static SourceKeyConfig Config(int id, bool encryption, bool hashing) => new()
@@ -289,8 +337,26 @@ public sealed class GeneratedEncryptedIdentityTokenWorkflowTests
         SourceKeyId = id,
         EncryptionAlgorithm = encryption ? DataEncryptionAlgorithm.Aes256 : null,
         HashAlgorithm = hashing ? DataHashAlgorithm.HmacSha256 : null,
-        SearchKeyHandle = hashing ? checked((ulong)id) : null
+        SearchKeyHandles = CreateSearchKeyHandles(id, hashing)
     };
+
+    private static IReadOnlyDictionary<string, ulong>? CreateSearchKeyHandles(int id, bool hashing) =>
+        !hashing
+            ? null
+            : id == 1
+                ? new Dictionary<string, ulong>
+                {
+                    ["IdentityUserName"] = checked((ulong)id),
+                    ["IdentityEmail"] = checked((ulong)id),
+                    ["IdentityRoleName"] = checked((ulong)id)
+                }
+                : new Dictionary<string, ulong>
+                {
+                    ["IdentityTokenLookup"] = checked((ulong)id),
+                    ["IdentityClaimRoute"] = checked((ulong)id),
+                    ["IdentityLoginRoute"] = checked((ulong)id),
+                    ["IdentityPasskeyCredential"] = checked((ulong)id)
+                };
 
     private static void AssertProtected(string stored, string plaintext)
     {
@@ -339,14 +405,14 @@ internal sealed class GeneratedUser : IdentityUser
     public override string? UserName { get; set; }
 
     [Encrypted("IdentityPII")]
-    [Hashed("IdentityPII", Normalization = DataNormalization.None, IsUnique = true)]
+    [Hashed("IdentityPII", "IdentityUserName", HashIndexType.Unique, DataNormalization.None)]
     public override string? NormalizedUserName { get; set; }
 
     [Encrypted("IdentityPII")]
     public override string? Email { get; set; }
 
     [Encrypted("IdentityPII")]
-    [Hashed("IdentityPII", Normalization = DataNormalization.None, IsUnique = false)]
+    [Hashed("IdentityPII", "IdentityEmail", HashIndexType.NonUnique, DataNormalization.None)]
     public override string? NormalizedEmail { get; set; }
 }
 
@@ -362,8 +428,39 @@ internal sealed class GeneratedUserToken : EncryptedIdentityUserToken<string>
     public override string? Value { get; set; }
 }
 
+internal sealed class GeneratedRole : IdentityRole
+{
+    [Encrypted("IdentityToken")]
+    public override string? Name { get; set; }
+
+    [Encrypted("IdentityToken")]
+    [Hashed("IdentityPII", "IdentityRoleName", HashIndexType.Unique, DataNormalization.None)]
+    public override string? NormalizedName { get; set; }
+}
+
+internal sealed class GeneratedUserClaim : EncryptedIdentityUserClaim<string>
+{
+    [Encrypted("IdentityToken")]
+    public override string? ClaimType { get; set; }
+
+    [Encrypted("IdentityToken")]
+    public override string? ClaimValue { get; set; }
+}
+
+internal sealed class GeneratedRoleClaim : EncryptedIdentityRoleClaim<string>
+{
+    [Encrypted("IdentityToken")]
+    public override string? ClaimType { get; set; }
+
+    [Encrypted("IdentityToken")]
+    public override string? ClaimValue { get; set; }
+}
+
 [GenerateEncryptedIdentityLookup]
 [GenerateEncryptedIdentityTokenStore("IdentityTokenLookup")]
+[GenerateEncryptedIdentityClaimStores("IdentityTokenLookup")]
+[GenerateEncryptedIdentityLoginStore("IdentityTokenLookup")]
+[GenerateEncryptedIdentityPasskeyStore("IdentityTokenLookup")]
 [GenerateEncryptedIdentityTokenMigrationAdapter]
 internal sealed class GeneratedTokenContext(
     DbContextOptions<GeneratedTokenContext> options,
@@ -371,19 +468,23 @@ internal sealed class GeneratedTokenContext(
     SourceKeyMapConfig sourceKeyMapConfig)
     : IdentityDbContext<
         GeneratedUser,
-        IdentityRole,
+        GeneratedRole,
         string,
-        IdentityUserClaim<string>,
+        GeneratedUserClaim,
         IdentityUserRole<string>,
-        IdentityUserLogin<string>,
-        IdentityRoleClaim<string>,
+        EncryptedIdentityUserLogin,
+        GeneratedRoleClaim,
         GeneratedUserToken,
-        IdentityUserPasskey<string>>(options)
+        EncryptedIdentityUserPasskey>(options)
 {
     protected override void OnModelCreating(ModelBuilder builder)
     {
         base.OnModelCreating(builder);
         builder.RemoveIdentityPlaintextLookupIndexes<GeneratedUser>();
+        builder.RemoveIdentityPlaintextRoleLookupIndex<GeneratedRole>();
+        builder.ConfigureEncryptedIdentityClaims<GeneratedUserClaim, GeneratedRoleClaim>();
+        builder.ConfigureEncryptedIdentityLogins<EncryptedIdentityUserLogin>();
+        builder.ConfigureEncryptedIdentityPasskeys<EncryptedIdentityUserPasskey>();
         builder.AddMrbrGeneratedEncryption(dataProtectionService, sourceKeyMapConfig);
     }
 }

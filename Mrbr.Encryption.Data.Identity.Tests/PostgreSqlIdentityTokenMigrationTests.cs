@@ -103,8 +103,22 @@ public sealed class PostgreSqlIdentityTokenMigrationTests
         SourceKeyId = id,
         EncryptionAlgorithm = encryption ? DataEncryptionAlgorithm.Aes256 : null,
         HashAlgorithm = hashing ? DataHashAlgorithm.HmacSha256 : null,
-        SearchKeyHandle = hashing ? checked((ulong)id) : null
+        SearchKeyHandles = CreateSearchKeyHandles(id, hashing)
     };
+
+    private static IReadOnlyDictionary<string, ulong>? CreateSearchKeyHandles(int id, bool hashing) =>
+        !hashing
+            ? null
+            : id == 1
+                ? new Dictionary<string, ulong>
+                {
+                    ["IdentityUserName"] = checked((ulong)id),
+                    ["IdentityEmail"] = checked((ulong)id)
+                }
+                : new Dictionary<string, ulong>
+                {
+                    ["IdentityTokenLookup"] = checked((ulong)id)
+                };
 
     private static async Task CreateLegacyDatabaseAsync(string connectionString)
     {

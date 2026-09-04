@@ -28,6 +28,7 @@ internal sealed class BenchmarkProtectionFixture : IDisposable
         RouteHashConfiguration = new HashedPropertyConfiguration(
             "IdentityTokenLookup",
             7,
+            "IdentityTokenLookup",
             searchKeyHandle,
             "Benchmark.ProtectedToken",
             "UserId+LoginProvider+Name",

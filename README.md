@@ -1,16 +1,21 @@
 # Mrbr.Encryption.Data.Identity
 
-Identity integration for `Mrbr.Encryption.Data`, providing collision-safe username, email, and protected user-token lookup over source-generated keyed deterministic hashes.
+Identity integration for `Mrbr.Encryption.Data`, providing collision-safe username, email, role-name, claim, and protected user-token lookup over source-generated keyed deterministic hashes.
 
 The proposed protection policy for the wider Identity schema is recorded in the [ASP.NET Core Identity entity security audit](docs/identity-entity-security-audit.md). The approved next phase is detailed in the [protected Identity user-token design](docs/identity-token-security-design.md), including its UUIDv7 surrogate key and composite keyed lookup.
 
 ## Current scope
 
 - ASP.NET Core Identity users and roles with `string` keys.
+- Public, provider-neutral, unsealed `EncryptedIdentityUser` and `EncryptedIdentityRole` entities for direct application use or optional consumer inheritance.
+- Public protected string-key user-claim and role-claim entities shared by every EF provider.
 - A reusable `UserStore` base that delegates username and email searches to source-generated, plaintext-verifying lookups.
+- A reusable `RoleStore` base that delegates normalized role-name searches to a source-generated, plaintext-verifying lookup and fails closed on ambiguous verified matches.
 - An Entity Framework model helper that removes Identity's plaintext lookup indexes before generated HMAC indexes are added.
 - An explicit `[GenerateEncryptedIdentityLookup]` marker used by `Mrbr.Encryption.Data.SourceGenerator` to emit the application-specific lookup adapter.
 - An explicit `[GenerateEncryptedIdentityTokenStore("IdentityTokenLookup")]` marker for UUIDv7 token keys, encrypted provider/name/value columns, and composite keyed routing.
+- An explicit `[GenerateEncryptedIdentityClaimStores("IdentityLookup")]` marker for encrypted user/role claim contents and owner/type/value composite keyed routing. It composes with the protected token store.
+- An explicit `[GenerateEncryptedIdentityLoginStore("IdentityLookup")]` marker for UUIDv7 external-login keys, encrypted provider metadata, and composite provider/key routing.
 - An optional `[GenerateEncryptedIdentityTokenMigrationAdapter]` marker, supplied by the non-packaged migration project, that emits the application-bound protection adapter and runtime verifier used for legacy token backfill, pre-cutover verification, and post-cutover Identity reads.
 - A non-packaged SQLite/PostgreSQL operator console that loads an application-owned bootstrap and exposes one explicit, acknowledged migration transition per invocation.
 
@@ -27,7 +32,7 @@ identity.AddEntityFrameworkStores<EncryptionDbContext>();
 identity.AddMrbrGeneratedIdentityStore<EncryptionDbContext>();
 ```
 
-The generated registration installs both the collision-verifying lookup and the encrypted user store. `EncryptedIdentityUserStore<TUser, TRole, TContext>` remains public for applications that deliberately need a custom store.
+The generated registration installs the collision-verifying user lookup and encrypted user store. When the context's role type protects `NormalizedName` with `[Hashed]`, it also installs the generated role lookup and encrypted role store. `EncryptedIdentityUserStore<TUser, TRole, TContext>` and `EncryptedIdentityRoleStore<TRole, TContext, TUserRole, TRoleClaim>` remain public for applications that deliberately need custom stores.
 
 The store accepts zero or one verified plaintext match. More than one verified match is treated as an invalid security state and throws rather than selecting an arbitrary account.
 
@@ -36,11 +41,11 @@ The store accepts zero or one verified plaintext match. More than one verified m
 Both Identity email modes are supported. Declare the database model through the normalized email attribute:
 
 ```csharp
-[Hashed("IdentityLookup", Normalization = DataNormalization.None, IsUnique = false)]
+[Hashed("IdentityLookup", "IdentityEmail", HashIndexType.NonUnique, DataNormalization.None)]
 public override string? NormalizedEmail { get; set; }
 ```
 
-Set `IsUnique = true` when `IdentityOptions.User.RequireUniqueEmail` is enabled and `false` when it is disabled. Generated store registration installs an options validator and enables `ValidateOnStart`; a hosted application fails startup if the runtime option does not match the generated HMAC index. Resolving `IdentityOptions` directly also performs the validation.
+Select `HashIndexType.Unique` when `IdentityOptions.User.RequireUniqueEmail` is enabled and `HashIndexType.NonUnique` when it is disabled. Generated store registration installs an options validator and enables `ValidateOnStart`; a hosted application fails startup if the runtime option does not match the generated HMAC index. Resolving `IdentityOptions` directly also performs the validation.
 
 Non-unique mode permits multiple accounts to store the same email. Because `FindByEmailAsync` cannot safely select one of several verified accounts, an ambiguous lookup fails closed. Workflows that allow duplicate emails must not treat an email address as an account identifier.
 
@@ -53,17 +58,24 @@ protected override void OnModelCreating(ModelBuilder modelBuilder)
 {
     base.OnModelCreating(modelBuilder);
     modelBuilder.RemoveIdentityPlaintextLookupIndexes<ApplicationUser>();
+    modelBuilder.RemoveIdentityPlaintextRoleLookupIndex<ApplicationRole>();
     modelBuilder.AddMrbrGeneratedEncryption(dataProtectionService, sourceKeyMapConfig);
 }
 ```
 
-The generated unique HMAC indexes then replace Identity's conventional plaintext lookup indexes.
+The generated unique HMAC indexes then replace Identity's conventional plaintext user and role lookup indexes.
 
 ## Security boundary
 
 Database HMAC matches are candidates, not proof of plaintext equality. The lookup implementation must use the generated collision-verifying query methods, which decrypt candidate rows and compare normalized plaintext before returning them.
 
-The initial package deliberately does not yet cover custom Identity key types, external-login tables, claims, or passkeys. Existing token rows now have explicit non-packaged SQLite and PostgreSQL migration paths. Token persistence and migration are integration-tested on both providers.
+The package now supports provider-neutral encrypted passkeys for new schemas, including independently protected typed fields and a keyed credential route used by generated Identity store operations. Protected roles, claims, external logins, and passkeys are implemented for new schemas; migration tooling for existing plaintext role, claim, login, and passkey rows remains future work. Existing token rows have explicit non-packaged SQLite and PostgreSQL migration paths. Custom Identity key types remain future work.
+
+## Protected claims
+
+Derive the context's claim types from `EncryptedIdentityUserClaim<string>` and `EncryptedIdentityRoleClaim<string>`, override `ClaimType` and `ClaimValue` with `[Encrypted]`, and mark the context with `[GenerateEncryptedIdentityClaimStores("IdentityLookup")]`. Configure their non-unique routing indexes with `ConfigureEncryptedIdentityClaims<TUserClaim, TRoleClaim>()` before `AddMrbrGeneratedEncryption(...)`.
+
+Generated stores compute a domain-separated HMAC over owner ID, claim type, and claim value. Replace and remove operations query that route and decrypt every candidate before mutation; any non-matching collision candidate fails closed. Duplicate identical claims remain valid Identity records. Because owner ID participates in the route, `GetUsersForClaimAsync` deliberately scans and verifies protected claims; applications relying heavily on that global operation need a separately reviewed type/value route.
 
 ## PostgreSQL integration tests
 
