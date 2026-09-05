@@ -1,13 +1,10 @@
 <Solution>
   <Project Path="Mrbr.Encryption.Data.Identity/Mrbr.Encryption.Data.Identity.csproj" />
   <Project Path="Mrbr.Encryption.Data.Identity.SqliteDemo/Mrbr.Encryption.Data.Identity.SqliteDemo.csproj" />
+  <Project Path="Mrbr.Encryption.Data.Identity.SqlitePqcDemo/Mrbr.Encryption.Data.Identity.SqlitePqcDemo.csproj" />
   <Project Path="Mrbr.Encryption.Data.Identity.Benchmarks/Mrbr.Encryption.Data.Identity.Benchmarks.csproj" />
-  <Project Path="Mrbr.Encryption.Data.Identity.Migration/Mrbr.Encryption.Data.Identity.Migration.csproj" />
-  <Project Path="Mrbr.Encryption.Data.Identity.Migration.Sqlite/Mrbr.Encryption.Data.Identity.Migration.Sqlite.csproj" />
-  <Project Path="Mrbr.Encryption.Data.Identity.Migration.Console/Mrbr.Encryption.Data.Identity.Migration.Console.csproj" />
-  <Project Path="Mrbr.Encryption.Data.Identity.Migration.PostgreSql/Mrbr.Encryption.Data.Identity.Migration.PostgreSql.csproj" />
   <Project Path="Mrbr.Encryption.Data.Identity.Tests/Mrbr.Encryption.Data.Identity.Tests.csproj" />
   <Folder Name="/Solution Items/">
-    <File Path="./Solution Items/todos.md" />
+    <File Path="Solution Items/todos.md" />
   </Folder>
 </Solution>

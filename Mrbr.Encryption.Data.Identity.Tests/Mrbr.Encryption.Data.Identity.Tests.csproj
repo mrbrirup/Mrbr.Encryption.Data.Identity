@@ -6,10 +6,6 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\Mrbr.Encryption.Data.Identity\Mrbr.Encryption.Data.Identity.csproj" />
-    <ProjectReference Include="..\Mrbr.Encryption.Data.Identity.Migration\Mrbr.Encryption.Data.Identity.Migration.csproj" />
-    <ProjectReference Include="..\Mrbr.Encryption.Data.Identity.Migration.Sqlite\Mrbr.Encryption.Data.Identity.Migration.Sqlite.csproj" />
-    <ProjectReference Include="..\Mrbr.Encryption.Data.Identity.Migration.Console\Mrbr.Encryption.Data.Identity.Migration.Console.csproj" />
-    <ProjectReference Include="..\Mrbr.Encryption.Data.Identity.Migration.PostgreSql\Mrbr.Encryption.Data.Identity.Migration.PostgreSql.csproj" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="10.0.9" />
@@ -23,14 +19,8 @@
     </PackageReference>
   </ItemGroup>
   <ItemGroup>
-    <PackageReference Include="Mrbr.Encryption.Data.SourceGenerator" Version="2.0.0"
-                      Condition="!Exists('$(MrbrSourceGeneratorProject)')"
-                      OutputItemType="Analyzer"
-                      ReferenceOutputAssembly="false" />
-    <ProjectReference Include="$(MrbrSourceGeneratorProject)"
-                      Condition="Exists('$(MrbrSourceGeneratorProject)')"
-                      OutputItemType="Analyzer"
-                      ReferenceOutputAssembly="false" />
+    <PackageReference Include="Mrbr.Encryption.Data.SourceGenerator" Version="2.0.0" Condition="!Exists('$(MrbrSourceGeneratorProject)')" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
+    <ProjectReference Include="$(MrbrSourceGeneratorProject)" Condition="Exists('$(MrbrSourceGeneratorProject)')" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
   </ItemGroup>
   <ItemGroup>
     <Using Include="Xunit" />

@@ -6,7 +6,7 @@ The proposed protection policy for the wider Identity schema is recorded in the 
 
 ## Current scope
 
-- ASP.NET Core Identity users and roles with `string` keys.
+- ASP.NET Core Identity users and roles with `string`, GUID, integer, or application-defined strongly typed keys.
 - Public, provider-neutral, unsealed `EncryptedIdentityUser` and `EncryptedIdentityRole` entities for direct application use or optional consumer inheritance.
 - Public protected string-key user-claim and role-claim entities shared by every EF provider.
 - A reusable `UserStore` base that delegates username and email searches to source-generated, plaintext-verifying lookups.
@@ -69,7 +69,7 @@ The generated unique HMAC indexes then replace Identity's conventional plaintext
 
 Database HMAC matches are candidates, not proof of plaintext equality. The lookup implementation must use the generated collision-verifying query methods, which decrypt candidate rows and compare normalized plaintext before returning them.
 
-The package now supports provider-neutral encrypted passkeys for new schemas, including independently protected typed fields and a keyed credential route used by generated Identity store operations. Protected roles, claims, external logins, and passkeys are implemented for new schemas; migration tooling for existing plaintext role, claim, login, and passkey rows remains future work. Existing token rows have explicit non-packaged SQLite and PostgreSQL migration paths. Custom Identity key types remain future work.
+The package supports provider-neutral encrypted passkeys for new schemas, including independently protected typed fields and a keyed credential route used by generated Identity store operations. Protected users, roles, claims, tokens, external logins, and passkeys work with string, GUID, integer, and explicitly serialized strongly typed identifiers. Migration tooling for existing plaintext role, claim, login, and passkey rows remains future work; existing token rows have explicit non-packaged SQLite and PostgreSQL migration paths.
 
 ## Protected claims
 

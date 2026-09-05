@@ -6,10 +6,13 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\Mrbr.Encryption.Data.Identity\Mrbr.Encryption.Data.Identity.csproj" />
+    <ProjectReference Include="..\..\Mrbr.Encryption.Data\Mrbr.Encryption.Data.Common\Mrbr.Encryption.Data.Common.csproj" />
+    <ProjectReference Include="..\..\Mrbr.Encryption.Data\Mrbr.Encryption.Data.SourceGenerator\Mrbr.Encryption.Data.SourceGenerator.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="BenchmarkDotNet" Version="0.16.0-preview.1" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="10.0.9" />
+    <PackageReference Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" Version="10.0.9" />
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.3" />
     <PackageReference Include="SQLitePCLRaw.lib.e_sqlite3" Version="2.1.13" />
     <ProjectReference Include="..\..\Mrbr.Encryption.Data\Mrbr.Encryption.Data.EntityFramework\Mrbr.Encryption.Data.EntityFramework.csproj" />

@@ -25,17 +25,30 @@ const byte credentialSourceKeyId = 4;
 const byte externalLoginSourceKeyId = 5;
 const byte passkeySourceKeyId = 6;
 const byte operationalSourceKeyId = 7;
+const byte tokenSourceKeyId = 8;
+#if PQC_SHOWCASE
+const DataEncryptionAlgorithm showcaseEncryptionAlgorithm = DataEncryptionAlgorithm.MlKem768;
+const string showcaseDatabasePrefix = "identity-pqc-encryption-showcase";
+#else
+const DataEncryptionAlgorithm showcaseEncryptionAlgorithm = DataEncryptionAlgorithm.Aes256;
+const string showcaseDatabasePrefix = "identity-encryption-showcase";
+#endif
 const string userName = "alice";
 const string email = "alice@example.test";
 const string phoneNumber = "+44 7700 900123";
 
-string databasePath = Path.GetFullPath(Path.Combine(
-    AppContext.BaseDirectory,
-    "..",
-    "..",
-    "..",
-    "identity-encryption-demo.db"));
-File.Delete(databasePath);
+if (args.Length > 1)
+{
+    throw new ArgumentException("Usage: dotnet run -- [database-path]");
+}
+string databasePath = args.Length == 1
+    ? Path.GetFullPath(args[0])
+    : Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..",
+        $"{showcaseDatabasePrefix}-{DateTime.UtcNow:yyyyMMdd-HHmmss}.db"));
+if (File.Exists(databasePath))
+{
+    throw new InvalidOperationException($"The showcase database already exists: {databasePath}. Choose a new path; existing databases are never overwritten.");
+}
 
 KeyServiceConfig keyConfig = new()
 {
@@ -46,6 +59,7 @@ KeyServiceConfig keyConfig = new()
     CreateKeySourceEntry(externalLoginSourceKeyId, 51),
     CreateKeySourceEntry(passkeySourceKeyId, 67),
     CreateKeySourceEntry(operationalSourceKeyId, 79)
+    , CreateKeySourceEntry(tokenSourceKeyId, 89)
 };
 
 KeyService keyService = new(new KeyServiceOptions(Options.Create(keyConfig)));
@@ -55,12 +69,14 @@ byte[] roleNameSearchKey = keyService.GenerateKey256(lookupSourceKeyId, out ulon
 byte[] claimSearchKey = keyService.GenerateKey256(lookupSourceKeyId, out ulong claimSearchKeyHandle);
 byte[] loginSearchKey = keyService.GenerateKey256(lookupSourceKeyId, out ulong loginSearchKeyHandle);
 byte[] passkeySearchKey = keyService.GenerateKey256(lookupSourceKeyId, out ulong passkeySearchKeyHandle);
+byte[] tokenSearchKey = keyService.GenerateKey256(lookupSourceKeyId, out ulong tokenSearchKeyHandle);
 CryptographicOperations.ZeroMemory(userNameSearchKey);
 CryptographicOperations.ZeroMemory(emailSearchKey);
 CryptographicOperations.ZeroMemory(roleNameSearchKey);
 CryptographicOperations.ZeroMemory(claimSearchKey);
 CryptographicOperations.ZeroMemory(loginSearchKey);
 CryptographicOperations.ZeroMemory(passkeySearchKey);
+CryptographicOperations.ZeroMemory(tokenSearchKey);
 
 ServiceCollection services = new();
 services.AddLogging();
@@ -72,7 +88,7 @@ services.AddSingleton(new SourceKeyMapConfig
     IdentityPII = new SourceKeyConfig
     {
         SourceKeyId = piiSourceKeyId,
-        EncryptionAlgorithm = DataEncryptionAlgorithm.Aes256
+        EncryptionAlgorithm = showcaseEncryptionAlgorithm
     },
     IdentityLookup = new SourceKeyConfig
     {
@@ -86,32 +102,44 @@ services.AddSingleton(new SourceKeyMapConfig
             , ["IdentityClaimRoute"] = claimSearchKeyHandle,
             ["IdentityLoginRoute"] = loginSearchKeyHandle,
             ["IdentityPasskeyCredential"] = passkeySearchKeyHandle
+            , ["IdentityTokenLookup"] = tokenSearchKeyHandle
         }
     },
     IdentityAuthorization = new SourceKeyConfig
     {
         SourceKeyId = authorizationSourceKeyId,
-        EncryptionAlgorithm = DataEncryptionAlgorithm.Aes256
+        EncryptionAlgorithm = showcaseEncryptionAlgorithm
     },
     IdentityCredential = new SourceKeyConfig
     {
         SourceKeyId = credentialSourceKeyId,
-        EncryptionAlgorithm = DataEncryptionAlgorithm.Aes256
+        EncryptionAlgorithm = showcaseEncryptionAlgorithm
     },
     IdentityExternalLogin = new SourceKeyConfig
     {
         SourceKeyId = externalLoginSourceKeyId,
-        EncryptionAlgorithm = DataEncryptionAlgorithm.Aes256
+        EncryptionAlgorithm = showcaseEncryptionAlgorithm
     },
     IdentityPasskey = new SourceKeyConfig
     {
         SourceKeyId = passkeySourceKeyId,
-        EncryptionAlgorithm = DataEncryptionAlgorithm.Aes256
+        EncryptionAlgorithm = showcaseEncryptionAlgorithm
     },
     IdentityOperational = new SourceKeyConfig
     {
         SourceKeyId = operationalSourceKeyId,
-        EncryptionAlgorithm = DataEncryptionAlgorithm.Aes256
+        EncryptionAlgorithm = showcaseEncryptionAlgorithm
+    },
+    IdentityToken = new SourceKeyConfig
+    {
+        SourceKeyId = tokenSourceKeyId,
+        EncryptionAlgorithm = showcaseEncryptionAlgorithm
+    },
+    IdentityTokenLookup = new SourceKeyConfig
+    {
+        SourceKeyId = lookupSourceKeyId,
+        HashAlgorithm = DataHashAlgorithm.HmacSha256,
+        SearchKeyHandles = new Dictionary<string, ulong> { ["IdentityTokenLookup"] = tokenSearchKeyHandle }
     }
 });
 services.AddDbContext<DemoIdentityDbContext>((serviceProvider, options) =>
@@ -144,6 +172,12 @@ IdentityResult created = await users.CreateAsync(user);
 if (!created.Succeeded)
 {
     throw new InvalidOperationException(string.Join(Environment.NewLine, created.Errors.Select(error => error.Description)));
+}
+
+await users.SetAuthenticationTokenAsync(user, "ExampleProvider", "RefreshToken", "demo-token-secret");
+if (await users.GetAuthenticationTokenAsync(user, "ExampleProvider", "RefreshToken") != "demo-token-secret")
+{
+    throw new InvalidOperationException("The protected Identity token round trip failed.");
 }
 
 RoleManager<EncryptedIdentityRole> roles = scope.ServiceProvider.GetRequiredService<RoleManager<EncryptedIdentityRole>>();
@@ -213,11 +247,13 @@ if (foundByName?.Email != email || foundByEmail?.PhoneNumber != phoneNumber ||
 }
 
 Console.WriteLine($"SQLite database: {databasePath}");
+Console.WriteLine($"Data encryption profile: {showcaseEncryptionAlgorithm}");
 Console.WriteLine($"UserManager lookup returned: {foundByName.UserName}, {foundByName.Email}, {foundByName.PhoneNumber}");
 Console.WriteLine($"RoleManager lookup returned: {foundRole.Name}");
 Console.WriteLine("User/role claim add, replace, and remove completed through protected routing.");
 Console.WriteLine("External-login add and lookup completed through protected routing.");
 Console.WriteLine("Passkey add, lookup, and materialization completed through protected routing.");
+Console.WriteLine("Authentication-token add and lookup completed through protected routing.");
 Console.WriteLine();
 Console.WriteLine("Raw AspNetUsers values:");
 
@@ -266,6 +302,20 @@ while (await claimReader.ReadAsync())
 await claimReader.CloseAsync();
 
 Console.WriteLine();
+Console.WriteLine("Raw AspNetUserTokens values:");
+await using DbCommand tokenCommand = rawConnection.CreateCommand();
+tokenCommand.CommandText = "SELECT TokenId, LoginProvider, Name, Value, RoutingHash, UserId FROM AspNetUserTokens";
+await using DbDataReader tokenReader = await tokenCommand.ExecuteReaderAsync();
+while (await tokenReader.ReadAsync())
+{
+    for (int index = 0; index < tokenReader.FieldCount; index++)
+    {
+        Console.WriteLine($"  {tokenReader.GetName(index)} = {tokenReader.GetValue(index)}");
+    }
+}
+await tokenReader.CloseAsync();
+
+Console.WriteLine();
 Console.WriteLine("Raw AspNetUserLogins values:");
 await using DbCommand loginCommand = rawConnection.CreateCommand();
 loginCommand.CommandText = "SELECT LoginId, LoginProvider, ProviderKey, ProviderDisplayName, RoutingHash, UserId FROM AspNetUserLogins";
@@ -307,7 +357,10 @@ static KeyServiceEntry CreateKeySourceEntry(byte sourceKeyId, int offset) => new
     BlockSettings = new KeyBlockSettings { MinLength = 64, MaxLength = 128 }
 };
 
+internal sealed class DemoIdentityUserToken : EncryptedIdentityUserToken<string>;
+
 [GenerateEncryptedIdentityLookup]
+[GenerateEncryptedIdentityTokenStore("IdentityTokenLookup")]
 [GenerateEncryptedIdentityClaimStores("IdentityLookup")]
 [GenerateEncryptedIdentityLoginStore("IdentityLookup")]
 [GenerateEncryptedIdentityPasskeyStore("IdentityLookup")]
@@ -323,7 +376,7 @@ internal sealed class DemoIdentityDbContext(
         IdentityUserRole<string>,
         EncryptedIdentityUserLogin,
         EncryptedIdentityRoleClaim,
-        IdentityUserToken<string>,
+        DemoIdentityUserToken,
         EncryptedIdentityUserPasskey>(options)
 {
     protected override void OnModelCreating(ModelBuilder modelBuilder)

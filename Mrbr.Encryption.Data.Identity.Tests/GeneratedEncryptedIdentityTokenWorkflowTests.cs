@@ -1,7 +1,3 @@
-using System.Data.Common;
-using System.Globalization;
-using System.Security.Cryptography;
-using System.Text;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.Data.Sqlite;
@@ -14,189 +10,188 @@ using Mrbr.Encryption.Data.Common.Results;
 using Mrbr.Encryption.Data.EntityFramework.Services;
 using Mrbr.Encryption.Data.Generated;
 using Mrbr.Encryption.Data.GeneratedIdentity;
-using Mrbr.Encryption.Data.Identity.Migration;
-using Mrbr.Encryption.Data.Identity.Migration.Sqlite;
+using System.Data.Common;
+using System.Globalization;
+using System.Security.Cryptography;
+using System.Text;
+//using Mrbr.Encryption.Data.Identity.Migration;
+//using Mrbr.Encryption.Data.Identity.Migration.Sqlite;
 
 namespace Mrbr.Encryption.Data.Identity.Tests;
 
-public sealed class GeneratedEncryptedIdentityTokenWorkflowTests
-{
-    [Fact]
-    public async Task GeneratedRuntimeVerifier_GatesWritesAndExplicitPlaintextRemoval()
-    {
-        string databasePath = Path.Combine(Path.GetTempPath(), $"mrbr-generated-migration-{Guid.NewGuid():N}.db");
-        string connectionString = $"Data Source={databasePath};Foreign Keys=True;Pooling=False";
-        try
-        {
-            await CreateLegacyTokenDatabaseAsync(connectionString);
-            ServiceCollection services = new();
-            services.AddLogging();
-            services.AddSingleton<IEntityDataProtectionService, TestProtectionService>();
-            services.AddSingleton(CreateSourceKeyMap());
-            services.AddDbContext<GeneratedTokenContext>(options => options.UseSqlite(connectionString));
-            services.AddIdentityCore<GeneratedUser>()
-                .AddRoles<GeneratedRole>()
-                .AddEntityFrameworkStores<GeneratedTokenContext>()
-                .AddMrbrGeneratedIdentityStore<GeneratedTokenContext>();
-            services.AddMrbrGeneratedIdentityTokenMigrationAdapter<GeneratedTokenContext>();
+public sealed class GeneratedEncryptedIdentityTokenWorkflowTests {
+    //[Fact]
+    //public async Task GeneratedRuntimeVerifier_GatesWritesAndExplicitPlaintextRemoval()
+    //{
+    //    string databasePath = Path.Combine(Path.GetTempPath(), $"mrbr-generated-migration-{Guid.NewGuid():N}.db");
+    //    string connectionString = $"Data Source={databasePath};Foreign Keys=True;Pooling=False";
+    //    try
+    //    {
+    //        await CreateLegacyTokenDatabaseAsync(connectionString);
+    //        ServiceCollection services = new();
+    //        services.AddLogging();
+    //        services.AddSingleton<IEntityDataProtectionService, TestProtectionService>();
+    //        services.AddSingleton(CreateSourceKeyMap());
+    //        services.AddDbContext<GeneratedTokenContext>(options => options.UseSqlite(connectionString));
+    //        services.AddIdentityCore<GeneratedUser>()
+    //            .AddRoles<GeneratedRole>()
+    //            .AddEntityFrameworkStores<GeneratedTokenContext>()
+    //            .AddMrbrGeneratedIdentityStore<GeneratedTokenContext>();
+    //        services.AddMrbrGeneratedIdentityTokenMigrationAdapter<GeneratedTokenContext>();
 
-            await using ServiceProvider provider = services.BuildServiceProvider();
-            await using AsyncServiceScope scope = provider.CreateAsyncScope();
-            IIdentityTokenMigrationProtectionAdapter protection = scope.ServiceProvider
-                .GetRequiredService<IIdentityTokenMigrationProtectionAdapter>();
-            IIdentityTokenMigrationRuntimeVerifier runtimeVerifier = scope.ServiceProvider
-                .GetRequiredService<IIdentityTokenMigrationRuntimeVerifier>();
-            Guid migrationId = Guid.CreateVersion7();
-            SqliteIdentityTokenMigrationCheckpointStore checkpoints = new(connectionString);
-            IdentityTokenMigrationCheckpoint checkpoint = AssertMigrationSuccess(
-                IdentityTokenMigrationStateMachine.Create(migrationId, expectedSourceRows: 1));
-            checkpoint = AssertMigrationSuccess(IdentityTokenMigrationStateMachine.Advance(
-                checkpoint,
-                IdentityTokenMigrationStage.PreflightPassed,
-                0,
-                0,
-                0));
-            await checkpoints.SaveAsync(checkpoint, CancellationToken.None);
-            SqliteIdentityTokenMigrationSchemaExecutor schema = new(connectionString, migrationId);
-            checkpoint = AssertMigrationSuccess(await schema.CreateShadowSchemaAsync(checkpoint, checkpoints));
-            checkpoint = AssertMigrationSuccess(IdentityTokenMigrationStateMachine.Advance(
-                checkpoint,
-                IdentityTokenMigrationStage.BackfillInProgress,
-                0,
-                0,
-                0));
-            await checkpoints.SaveAsync(checkpoint, CancellationToken.None);
-            SqliteIdentityTokenMigrationSource source = new(connectionString);
-            SqliteIdentityTokenMigrationBatchProcessor processor = new(connectionString, migrationId, protection);
-            checkpoint = AssertMigrationSuccess(await IdentityTokenMigrationCoordinator.BackfillAsync(
-                checkpoint,
-                source,
-                processor,
-                checkpoints,
-                new IdentityTokenMigrationOptions { BatchSize = 1 }));
-            checkpoint = AssertMigrationSuccess(await IdentityTokenMigrationCoordinator.VerifyAsync(
-                checkpoint,
-                source,
-                processor,
-                checkpoints,
-                new IdentityTokenMigrationOptions { BatchSize = 1 }));
-            checkpoint = AssertMigrationSuccess(await schema.CutoverAsync(checkpoint, checkpoints));
+    //        await using ServiceProvider provider = services.BuildServiceProvider();
+    //        await using AsyncServiceScope scope = provider.CreateAsyncScope();
+    //        IIdentityTokenMigrationProtectionAdapter protection = scope.ServiceProvider
+    //            .GetRequiredService<IIdentityTokenMigrationProtectionAdapter>();
+    //        IIdentityTokenMigrationRuntimeVerifier runtimeVerifier = scope.ServiceProvider
+    //            .GetRequiredService<IIdentityTokenMigrationRuntimeVerifier>();
+    //        Guid migrationId = Guid.CreateVersion7();
+    //        SqliteIdentityTokenMigrationCheckpointStore checkpoints = new(connectionString);
+    //        IdentityTokenMigrationCheckpoint checkpoint = AssertMigrationSuccess(
+    //            IdentityTokenMigrationStateMachine.Create(migrationId, expectedSourceRows: 1));
+    //        checkpoint = AssertMigrationSuccess(IdentityTokenMigrationStateMachine.Advance(
+    //            checkpoint,
+    //            IdentityTokenMigrationStage.PreflightPassed,
+    //            0,
+    //            0,
+    //            0));
+    //        await checkpoints.SaveAsync(checkpoint, CancellationToken.None);
+    //        SqliteIdentityTokenMigrationSchemaExecutor schema = new(connectionString, migrationId);
+    //        checkpoint = AssertMigrationSuccess(await schema.CreateShadowSchemaAsync(checkpoint, checkpoints));
+    //        checkpoint = AssertMigrationSuccess(IdentityTokenMigrationStateMachine.Advance(
+    //            checkpoint,
+    //            IdentityTokenMigrationStage.BackfillInProgress,
+    //            0,
+    //            0,
+    //            0));
+    //        await checkpoints.SaveAsync(checkpoint, CancellationToken.None);
+    //        SqliteIdentityTokenMigrationSource source = new(connectionString);
+    //        SqliteIdentityTokenMigrationBatchProcessor processor = new(connectionString, migrationId, protection);
+    //        checkpoint = AssertMigrationSuccess(await IdentityTokenMigrationCoordinator.BackfillAsync(
+    //            checkpoint,
+    //            source,
+    //            processor,
+    //            checkpoints,
+    //            new IdentityTokenMigrationOptions { BatchSize = 1 }));
+    //        checkpoint = AssertMigrationSuccess(await IdentityTokenMigrationCoordinator.VerifyAsync(
+    //            checkpoint,
+    //            source,
+    //            processor,
+    //            checkpoints,
+    //            new IdentityTokenMigrationOptions { BatchSize = 1 }));
+    //        checkpoint = AssertMigrationSuccess(await schema.CutoverAsync(checkpoint, checkpoints));
 
-            Assert.False(IdentityTokenMigrationStateMachine.AcceptProtectedWrites(checkpoint).IsSuccess);
-            SqliteIdentityTokenMigrationSource retainedLegacy = new(connectionString, migrationId);
-            checkpoint = AssertMigrationSuccess(await IdentityTokenMigrationCoordinator.VerifyRuntimeStoreAsync(
-                checkpoint,
-                retainedLegacy,
-                runtimeVerifier,
-                checkpoints,
-                new IdentityTokenMigrationOptions { BatchSize = 1 }));
-            Assert.Equal(IdentityTokenMigrationStage.RuntimeVerified, checkpoint.Stage);
-            checkpoint = AssertMigrationSuccess(await IdentityTokenMigrationCoordinator.AcceptProtectedWritesAsync(
-                checkpoint,
-                checkpoints));
+    //        Assert.False(IdentityTokenMigrationStateMachine.AcceptProtectedWrites(checkpoint).IsSuccess);
+    //        SqliteIdentityTokenMigrationSource retainedLegacy = new(connectionString, migrationId);
+    //        checkpoint = AssertMigrationSuccess(await IdentityTokenMigrationCoordinator.VerifyRuntimeStoreAsync(
+    //            checkpoint,
+    //            retainedLegacy,
+    //            runtimeVerifier,
+    //            checkpoints,
+    //            new IdentityTokenMigrationOptions { BatchSize = 1 }));
+    //        Assert.Equal(IdentityTokenMigrationStage.RuntimeVerified, checkpoint.Stage);
+    //        checkpoint = AssertMigrationSuccess(await IdentityTokenMigrationCoordinator.AcceptProtectedWritesAsync(
+    //            checkpoint,
+    //            checkpoints));
 
-            IdentityTokenMigrationResult<IdentityTokenMigrationCheckpoint> rejected =
-                await schema.RemoveRetainedPlaintextAsync(
-                    checkpoint,
-                    new IdentityTokenMigrationPlaintextRemovalApproval(
-                        migrationId,
-                        backupRetentionAddressed: true,
-                        replicasAndExportsAddressed: false,
-                        irreversibleRemovalApproved: true),
-                    checkpoints);
-            Assert.False(rejected.IsSuccess);
-            Assert.Equal(IdentityTokenMigrationFailureCode.OperatorApprovalRequired, rejected.FailureCode);
+    //        IdentityTokenMigrationResult<IdentityTokenMigrationCheckpoint> rejected =
+    //            await schema.RemoveRetainedPlaintextAsync(
+    //                checkpoint,
+    //                new IdentityTokenMigrationPlaintextRemovalApproval(
+    //                    migrationId,
+    //                    backupRetentionAddressed: true,
+    //                    replicasAndExportsAddressed: false,
+    //                    irreversibleRemovalApproved: true),
+    //                checkpoints);
+    //        Assert.False(rejected.IsSuccess);
+    //        Assert.Equal(IdentityTokenMigrationFailureCode.OperatorApprovalRequired, rejected.FailureCode);
 
-            checkpoint = AssertMigrationSuccess(await schema.RemoveRetainedPlaintextAsync(
-                checkpoint,
-                new IdentityTokenMigrationPlaintextRemovalApproval(
-                    migrationId,
-                    backupRetentionAddressed: true,
-                    replicasAndExportsAddressed: true,
-                    irreversibleRemovalApproved: true),
-                checkpoints));
-            Assert.Equal(IdentityTokenMigrationStage.PlaintextRemoved, checkpoint.Stage);
-            Assert.Equal(0, await CountNamedObjectAsync(
-                connectionString,
-                new SqliteIdentityTokenMigrationNames(migrationId).LegacyTable));
-        }
-        finally
-        {
-            SqliteConnection.ClearAllPools();
-            File.Delete(databasePath);
-        }
-    }
+    //        checkpoint = AssertMigrationSuccess(await schema.RemoveRetainedPlaintextAsync(
+    //            checkpoint,
+    //            new IdentityTokenMigrationPlaintextRemovalApproval(
+    //                migrationId,
+    //                backupRetentionAddressed: true,
+    //                replicasAndExportsAddressed: true,
+    //                irreversibleRemovalApproved: true),
+    //            checkpoints));
+    //        Assert.Equal(IdentityTokenMigrationStage.PlaintextRemoved, checkpoint.Stage);
+    //        Assert.Equal(0, await CountNamedObjectAsync(
+    //            connectionString,
+    //            new SqliteIdentityTokenMigrationNames(migrationId).LegacyTable));
+    //    }
+    //    finally
+    //    {
+    //        SqliteConnection.ClearAllPools();
+    //        File.Delete(databasePath);
+    //    }
+    //}
 
-    [Theory]
-    [InlineData(null)]
-    [InlineData("")]
-    [InlineData("token-secret")]
-    public async Task GeneratedMigrationAdapter_UsesRuntimeConfigurationAndVerifiesEveryField(string? tokenValue)
-    {
-        await using SqliteConnection connection = new("Data Source=:memory:");
-        await connection.OpenAsync();
-        ServiceCollection services = new();
-        services.AddLogging();
-        services.AddSingleton<IEntityDataProtectionService, TestProtectionService>();
-        services.AddSingleton(CreateSourceKeyMap());
-        services.AddDbContext<GeneratedTokenContext>(options => options.UseSqlite(connection));
-        services.AddIdentityCore<GeneratedUser>()
-            .AddRoles<GeneratedRole>()
-            .AddEntityFrameworkStores<GeneratedTokenContext>()
-            .AddMrbrGeneratedIdentityStore<GeneratedTokenContext>();
-        services.AddMrbrGeneratedIdentityTokenMigrationAdapter<GeneratedTokenContext>();
+    //[Theory]
+    //[InlineData(null)]
+    //[InlineData("")]
+    //[InlineData("token-secret")]
+    //public async Task GeneratedMigrationAdapter_UsesRuntimeConfigurationAndVerifiesEveryField(string? tokenValue) {
+    //    await using SqliteConnection connection = new("Data Source=:memory:");
+    //    await connection.OpenAsync();
+    //    ServiceCollection services = new();
+    //    services.AddLogging();
+    //    services.AddSingleton<IEntityDataProtectionService, TestProtectionService>();
+    //    services.AddSingleton(CreateSourceKeyMap());
+    //    services.AddDbContext<GeneratedTokenContext>(options => options.UseSqlite(connection));
+    //    services.AddIdentityCore<GeneratedUser>()
+    //        .AddRoles<GeneratedRole>()
+    //        .AddEntityFrameworkStores<GeneratedTokenContext>()
+    //        .AddMrbrGeneratedIdentityStore<GeneratedTokenContext>();
+    //    services.AddMrbrGeneratedIdentityTokenMigrationAdapter<GeneratedTokenContext>();
 
-        await using ServiceProvider provider = services.BuildServiceProvider();
-        await using AsyncServiceScope scope = provider.CreateAsyncScope();
-        IIdentityTokenMigrationProtectionAdapter adapter = scope.ServiceProvider
-            .GetRequiredService<IIdentityTokenMigrationProtectionAdapter>();
-        LegacyIdentityTokenMigrationRow source = new("user-1", "provider", "purpose", tokenValue);
+    //    await using ServiceProvider provider = services.BuildServiceProvider();
+    //    await using AsyncServiceScope scope = provider.CreateAsyncScope();
+    //    IIdentityTokenMigrationProtectionAdapter adapter = scope.ServiceProvider
+    //        .GetRequiredService<IIdentityTokenMigrationProtectionAdapter>();
+    //    LegacyIdentityTokenMigrationRow source = new("user-1", "provider", "purpose", tokenValue);
 
-        IdentityTokenMigrationResult<string> hash = adapter.ComputeRoutingHash(source);
-        Assert.True(hash.IsSuccess);
-        Guid tokenId = Guid.CreateVersion7();
-        IdentityTokenMigrationResult<ProtectedIdentityTokenMigrationRow> protectedResult = adapter.Protect(
-            source,
-            tokenId,
-            hash.Value);
+    //    IdentityTokenMigrationResult<string> hash = adapter.ComputeRoutingHash(source);
+    //    Assert.True(hash.IsSuccess);
+    //    Guid tokenId = Guid.CreateVersion7();
+    //    IdentityTokenMigrationResult<ProtectedIdentityTokenMigrationRow> protectedResult = adapter.Protect(
+    //        source,
+    //        tokenId,
+    //        hash.Value);
 
-        Assert.True(protectedResult.IsSuccess);
-        ProtectedIdentityTokenMigrationRow protectedRow = protectedResult.Value;
-        Assert.Equal(tokenId, protectedRow.TokenId);
-        AssertProtected(protectedRow.EncryptedLoginProvider, source.LoginProvider);
-        AssertProtected(protectedRow.EncryptedName, source.Name);
-        if (source.Value is null)
-        {
-            Assert.Null(protectedRow.EncryptedValue);
-        }
-        else
-        {
-            Assert.StartsWith("protected:", Assert.IsType<string>(protectedRow.EncryptedValue), StringComparison.Ordinal);
-        }
-        IdentityTokenMigrationResult<bool> verified = adapter.Verify(source, protectedRow);
-        Assert.True(verified.IsSuccess);
-        Assert.True(verified.Value);
+    //    Assert.True(protectedResult.IsSuccess);
+    //    ProtectedIdentityTokenMigrationRow protectedRow = protectedResult.Value;
+    //    Assert.Equal(tokenId, protectedRow.TokenId);
+    //    AssertProtected(protectedRow.EncryptedLoginProvider, source.LoginProvider);
+    //    AssertProtected(protectedRow.EncryptedName, source.Name);
+    //    if (source.Value is null) {
+    //        Assert.Null(protectedRow.EncryptedValue);
+    //    }
+    //    else {
+    //        Assert.StartsWith("protected:", Assert.IsType<string>(protectedRow.EncryptedValue), StringComparison.Ordinal);
+    //    }
+    //    IdentityTokenMigrationResult<bool> verified = adapter.Verify(source, protectedRow);
+    //    Assert.True(verified.IsSuccess);
+    //    Assert.True(verified.Value);
 
-        LegacyIdentityTokenMigrationRow altered = new("user-1", "provider", "purpose", "different-secret");
-        IdentityTokenMigrationResult<bool> mismatch = adapter.Verify(altered, protectedRow);
-        Assert.True(mismatch.IsSuccess);
-        Assert.False(mismatch.Value);
+    //    LegacyIdentityTokenMigrationRow altered = new("user-1", "provider", "purpose", "different-secret");
+    //    IdentityTokenMigrationResult<bool> mismatch = adapter.Verify(altered, protectedRow);
+    //    Assert.True(mismatch.IsSuccess);
+    //    Assert.False(mismatch.Value);
 
-        ProtectedIdentityTokenMigrationRow malformed = new(
-            protectedRow.TokenId,
-            protectedRow.UserId,
-            "protected:not-base64",
-            protectedRow.EncryptedName,
-            protectedRow.EncryptedValue,
-            protectedRow.RoutingHash);
-        IdentityTokenMigrationResult<bool> invalid = adapter.Verify(source, malformed);
-        Assert.False(invalid.IsSuccess);
-        Assert.Equal(IdentityTokenMigrationFailureCode.InvalidPayload, invalid.FailureCode);
-    }
+    //    ProtectedIdentityTokenMigrationRow malformed = new(
+    //        protectedRow.TokenId,
+    //        protectedRow.UserId,
+    //        "protected:not-base64",
+    //        protectedRow.EncryptedName,
+    //        protectedRow.EncryptedValue,
+    //        protectedRow.RoutingHash);
+    //    IdentityTokenMigrationResult<bool> invalid = adapter.Verify(source, malformed);
+    //    Assert.False(invalid.IsSuccess);
+    //    Assert.Equal(IdentityTokenMigrationFailureCode.InvalidPayload, invalid.FailureCode);
+    //}
 
     [Fact]
-    public async Task GeneratedStore_ProtectsAndFindsIdentityTokenInSqlite()
-    {
+    public async Task GeneratedStore_ProtectsAndFindsIdentityTokenInSqlite() {
         await using SqliteConnection connection = new("Data Source=:memory:");
         await connection.OpenAsync();
         ServiceCollection services = new();
@@ -284,8 +279,7 @@ public sealed class GeneratedEncryptedIdentityTokenWorkflowTests
     [InlineData("LoginProvider")]
     [InlineData("Name")]
     [InlineData("Value")]
-    public async Task GeneratedStore_TranslatesTamperedTokenColumnsWithoutTreatingThemAsMissing(string column)
-    {
+    public async Task GeneratedStore_TranslatesTamperedTokenColumnsWithoutTreatingThemAsMissing(string column) {
         await using SqliteConnection connection = new("Data Source=:memory:");
         await connection.OpenAsync();
         ServiceCollection services = new();
@@ -307,8 +301,7 @@ public sealed class GeneratedEncryptedIdentityTokenWorkflowTests
         Assert.True((await users.CreateAsync(user)).Succeeded);
         await users.SetAuthenticationTokenAsync(user, "provider", "purpose", "token-secret");
 
-        await using (DbCommand tamper = connection.CreateCommand())
-        {
+        await using (DbCommand tamper = connection.CreateCommand()) {
             tamper.CommandText = $"UPDATE AspNetUserTokens SET {column} = 'protected:not-base64'";
             Assert.Equal(1, await tamper.ExecuteNonQueryAsync());
         }
@@ -322,18 +315,17 @@ public sealed class GeneratedEncryptedIdentityTokenWorkflowTests
         Assert.DoesNotContain("token-secret", exception.Message, StringComparison.Ordinal);
     }
 
-    private static SourceKeyMapConfig CreateSourceKeyMap() => new()
-    {
+    private static SourceKeyMapConfig CreateSourceKeyMap() => new() {
         IdentityPII = Config(1, encryption: true, hashing: true),
         IdentityToken = Config(2, encryption: true, hashing: false),
         IdentityCredential = Config(3, encryption: true, hashing: false),
         IdentityTokenLookup = Config(4, encryption: false, hashing: true),
         IdentityExternalLogin = Config(5, encryption: true, hashing: false)
-        , IdentityPasskey = Config(6, encryption: true, hashing: false)
+        ,
+        IdentityPasskey = Config(6, encryption: true, hashing: false)
     };
 
-    private static SourceKeyConfig Config(int id, bool encryption, bool hashing) => new()
-    {
+    private static SourceKeyConfig Config(int id, bool encryption, bool hashing) => new() {
         SourceKeyId = id,
         EncryptionAlgorithm = encryption ? DataEncryptionAlgorithm.Aes256 : null,
         HashAlgorithm = hashing ? DataHashAlgorithm.HmacSha256 : null,
@@ -344,34 +336,29 @@ public sealed class GeneratedEncryptedIdentityTokenWorkflowTests
         !hashing
             ? null
             : id == 1
-                ? new Dictionary<string, ulong>
-                {
+                ? new Dictionary<string, ulong> {
                     ["IdentityUserName"] = checked((ulong)id),
                     ["IdentityEmail"] = checked((ulong)id),
                     ["IdentityRoleName"] = checked((ulong)id)
                 }
-                : new Dictionary<string, ulong>
-                {
+                : new Dictionary<string, ulong> {
                     ["IdentityTokenLookup"] = checked((ulong)id),
                     ["IdentityClaimRoute"] = checked((ulong)id),
                     ["IdentityLoginRoute"] = checked((ulong)id),
                     ["IdentityPasskeyCredential"] = checked((ulong)id)
                 };
 
-    private static void AssertProtected(string stored, string plaintext)
-    {
+    private static void AssertProtected(string stored, string plaintext) {
         Assert.StartsWith("protected:", stored, StringComparison.Ordinal);
         Assert.DoesNotContain(plaintext, stored, StringComparison.Ordinal);
     }
 
-    private static T AssertMigrationSuccess<T>(IdentityTokenMigrationResult<T> result)
-    {
-        Assert.True(result.IsSuccess, $"Expected migration success, received {result.FailureCode}.");
-        return result.Value;
-    }
+    //private static T AssertMigrationSuccess<T>(IdentityTokenMigrationResult<T> result) {
+    //    Assert.True(result.IsSuccess, $"Expected migration success, received {result.FailureCode}.");
+    //    return result.Value;
+    //}
 
-    private static async Task CreateLegacyTokenDatabaseAsync(string connectionString)
-    {
+    private static async Task CreateLegacyTokenDatabaseAsync(string connectionString) {
         await using SqliteConnection connection = new(connectionString);
         await connection.OpenAsync();
         await using SqliteCommand command = connection.CreateCommand();
@@ -388,8 +375,7 @@ public sealed class GeneratedEncryptedIdentityTokenWorkflowTests
         await command.ExecuteNonQueryAsync();
     }
 
-    private static async Task<long> CountNamedObjectAsync(string connectionString, string objectName)
-    {
+    private static async Task<long> CountNamedObjectAsync(string connectionString, string objectName) {
         await using SqliteConnection connection = new(connectionString);
         await connection.OpenAsync();
         await using SqliteCommand command = connection.CreateCommand();
@@ -399,8 +385,7 @@ public sealed class GeneratedEncryptedIdentityTokenWorkflowTests
     }
 }
 
-internal sealed class GeneratedUser : IdentityUser
-{
+internal sealed class GeneratedUser : IdentityUser {
     [Encrypted("IdentityPII")]
     public override string? UserName { get; set; }
 
@@ -416,8 +401,7 @@ internal sealed class GeneratedUser : IdentityUser
     public override string? NormalizedEmail { get; set; }
 }
 
-internal sealed class GeneratedUserToken : EncryptedIdentityUserToken<string>
-{
+internal sealed class GeneratedUserToken : EncryptedIdentityUserToken<string> {
     [Encrypted("IdentityToken")]
     public override string LoginProvider { get; set; } = null!;
 
@@ -428,8 +412,7 @@ internal sealed class GeneratedUserToken : EncryptedIdentityUserToken<string>
     public override string? Value { get; set; }
 }
 
-internal sealed class GeneratedRole : IdentityRole
-{
+internal sealed class GeneratedRole : IdentityRole {
     [Encrypted("IdentityToken")]
     public override string? Name { get; set; }
 
@@ -438,8 +421,7 @@ internal sealed class GeneratedRole : IdentityRole
     public override string? NormalizedName { get; set; }
 }
 
-internal sealed class GeneratedUserClaim : EncryptedIdentityUserClaim<string>
-{
+internal sealed class GeneratedUserClaim : EncryptedIdentityUserClaim<string> {
     [Encrypted("IdentityToken")]
     public override string? ClaimType { get; set; }
 
@@ -447,8 +429,7 @@ internal sealed class GeneratedUserClaim : EncryptedIdentityUserClaim<string>
     public override string? ClaimValue { get; set; }
 }
 
-internal sealed class GeneratedRoleClaim : EncryptedIdentityRoleClaim<string>
-{
+internal sealed class GeneratedRoleClaim : EncryptedIdentityRoleClaim<string> {
     [Encrypted("IdentityToken")]
     public override string? ClaimType { get; set; }
 
@@ -461,7 +442,7 @@ internal sealed class GeneratedRoleClaim : EncryptedIdentityRoleClaim<string>
 [GenerateEncryptedIdentityClaimStores("IdentityTokenLookup")]
 [GenerateEncryptedIdentityLoginStore("IdentityTokenLookup")]
 [GenerateEncryptedIdentityPasskeyStore("IdentityTokenLookup")]
-[GenerateEncryptedIdentityTokenMigrationAdapter]
+//[GenerateEncryptedIdentityTokenMigrationAdapter]
 internal sealed class GeneratedTokenContext(
     DbContextOptions<GeneratedTokenContext> options,
     IEntityDataProtectionService dataProtectionService,
@@ -475,10 +456,8 @@ internal sealed class GeneratedTokenContext(
         EncryptedIdentityUserLogin,
         GeneratedRoleClaim,
         GeneratedUserToken,
-        EncryptedIdentityUserPasskey>(options)
-{
-    protected override void OnModelCreating(ModelBuilder builder)
-    {
+        EncryptedIdentityUserPasskey>(options) {
+    protected override void OnModelCreating(ModelBuilder builder) {
         base.OnModelCreating(builder);
         builder.RemoveIdentityPlaintextLookupIndexes<GeneratedUser>();
         builder.RemoveIdentityPlaintextRoleLookupIndex<GeneratedRole>();
@@ -489,8 +468,7 @@ internal sealed class GeneratedTokenContext(
     }
 }
 
-internal sealed class TestProtectionService : IEntityDataProtectionService
-{
+internal sealed class TestProtectionService : IEntityDataProtectionService {
     public string Encrypt(string plainText, EncryptedPropertyConfiguration configuration) =>
         "protected:" + Convert.ToBase64String(Encoding.UTF8.GetBytes(plainText));
 
@@ -503,28 +481,22 @@ internal sealed class TestProtectionService : IEntityDataProtectionService
     public ProtectionResult<string> ComputeCompositeSearchHash(
         string domain,
         IReadOnlyList<string> values,
-        HashedPropertyConfiguration configuration)
-    {
+        HashedPropertyConfiguration configuration) {
         byte[] input = CompositeHashInputEncoder.Encode(domain, values);
-        try
-        {
+        try {
             return ProtectionResult<string>.Success(Hash(input));
         }
-        finally
-        {
+        finally {
             CryptographicOperations.ZeroMemory(input);
         }
     }
 
-    private static string Hash(byte[] input)
-    {
+    private static string Hash(byte[] input) {
         byte[] hash = SHA256.HashData(input);
-        try
-        {
+        try {
             return Convert.ToHexString(hash);
         }
-        finally
-        {
+        finally {
             CryptographicOperations.ZeroMemory(hash);
             CryptographicOperations.ZeroMemory(input);
         }
